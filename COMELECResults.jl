@@ -20,6 +20,7 @@ end
 function main()
 
     final_df=DataFrame()
+    candidate_ids=[]
     candidates=[]
     votes=[]
     precincts=[]
@@ -74,74 +75,79 @@ function main()
                 r4=HTTP.request("GET", citymunurl,[useragent]; verbose=0)
                 root4=JSON.parse(String(r4.body),dicttype=LittleDict)["srs"]
         
+                @sync begin
+                    for barangay in values(root4)
+                        @async begin
+                            barangayname=barangay["rn"]
+                            #println("\n","    "*"------"*barangayname*"-----\n")
 
-                for barangay in values(root4)
-                    barangayname=barangay["rn"]
-                    #println("\n","    "*"------"*barangayname*"-----\n")
+                            barangayurl="https://2022electionresults.comelec.gov.ph/data/regions/"*barangay["url"]*".json"
+                            
+                            #get precincts
+                            r5=HTTP.request("GET", barangayurl,[useragent]; verbose=0)
+                            root5=JSON.parse(String(r5.body),dicttype=LittleDict)["pps"]
+                            for precinct in values(root5[1]["vbs"])
+                                precinctcode=precinct["pre"]
+                                precincturl="https://2022electionresults.comelec.gov.ph/data/results/"*precinct["url"]*".json"
+                                
+                                try
+                                #get candidate votes per precinct
+                                    r6=HTTP.request("GET", precincturl,[useragent]; verbose=0)
+                                    root6=JSON.parse(String(r6.body),dicttype=LittleDict)["rs"]
+                                    for i in root6
+                                        if i["cc"] == 5587||i["cc"] == 5588||i["cc"] == 5589
+                                            #=println("Candidate: ",CANDIDATELIST[i["bo"]])
+                                            println("Votes: ", i["v"])
+                                            println("Percentage: ",i["per"])=#
 
-                    barangayurl="https://2022electionresults.comelec.gov.ph/data/regions/"*barangay["url"]*".json"
+                                            #push element into our arrays
+                                            push!(candidate_ids,i["bo"])
+                                            push!(candidates,CANDIDATELIST[i["bo"]])
+                                            push!(votes,i["v"])
+                                            push!(precincts,precinctcode)
+                                            push!(barangays,barangayname)
+                                            push!(citymuns,citymunname)
+                                            push!(provinces,provincename)
+                                            push!(regions,regionname)
 
-                    #get precincts
-                    r5=HTTP.request("GET", barangayurl,[useragent]; verbose=0)
-                    root5=JSON.parse(String(r5.body),dicttype=LittleDict)["pps"]
-                    for precinct in values(root5[1]["vbs"])
-
-                        precinctcode=precinct["pre"]
-                        precincturl="https://2022electionresults.comelec.gov.ph/data/results/"*precinct["url"]*".json"
-                        
-                        try
-                        #get candidate votes per precinct
-                            r6=HTTP.request("GET", precincturl,[useragent]; verbose=0)
-                            root6=JSON.parse(String(r6.body),dicttype=LittleDict)["rs"]
-                            for i in root6
-                                if i["cc"] == 5587||i["cc"] == 5588||i["cc"] == 5589
-                                    #=println("Candidate: ",CANDIDATELIST[i["bo"]])
-                                    println("Votes: ", i["v"])
-                                    println("Percentage: ",i["per"])=#
-
-                                    #push element into our arrays
-                                    push!(candidates,CANDIDATELIST[i["bo"]])
-                                    push!(votes,i["v"])
-                                    push!(precincts,precinctcode)
-                                    push!(barangays,barangayname)
-                                    push!(citymuns,citymunname)
-                                    push!(provinces,provincename)
-                                    push!(regions,regionname)
-
-                                    #=println("candidates: ", candidates, ",", "Votes: ",votes)
-                                    println("precinct: ",precincts)
-                                    println("Barangay: ",barangays)
-                                    println("City/Municipality: ",citymuns)
-                                    println("Region: ",regions)
-                                    println("Province: ",provinces)
-                                    println("\n")=#
+                                            #=println("candidates: ", candidates, ",", "Votes: ",votes)
+                                            println("precinct: ",precincts)
+                                            println("Barangay: ",barangays)
+                                            println("City/Municipality: ",citymuns)
+                                            println("Region: ",regions)
+                                            println("Province: ",provinces)
+                                            println("\n")=#
+                                        end
+                                    end
+                                catch
+                                    #push!(failed,Dict("Precinct"=>precinctcode, "Barangay"=>barangayname,"CityMun"=>citymunname,"Province"=>provincename,"Region"=>regionname))
+                                    push!(failed,[precinctcode,barangayname,citymunname,provincename,regionname])
                                 end
-                            end
-                        catch
-                            #push!(failed,Dict("Precinct"=>precinctcode, "Barangay"=>barangayname,"CityMun"=>citymunname,"Province"=>provincename,"Region"=>regionname))
-                            push!(failed,[precinctcode,barangayname,citymunname,provincename,regionname])
-                        end
+                                
 
-                        #=println("precinct: ",precinctcode)
-                        println("URL: ", precincturl)
-                        println("Region: ",regionname)
-                        println("Province: ",provincename)
-                        println("City/Municipality: ",citymunname)
-                        println("Barangay: ",barangayname)
-                        println("\n")=#
-                    end                    
-                    
-                    #println(barangayname, " ", barangayurl)
+                                #=println("precinct: ",precinctcode)
+                                println("URL: ", precincturl)
+                                println("Region: ",regionname)
+                                println("Province: ",provincename)
+                                println("City/Municipality: ",citymunname)
+                                println("Barangay: ",barangayname)
+                                println("\n")=#
+                            end 
+                                              
+                        end
+                        #println(barangayname, " ", barangayurl)
+                    end
                 end
                 
                 #println(citymunname, " ", citymunurl)
             end            
-            sleep(1) #pause script for a bit to avoid the timeout
+            #sleep(1) #pause script for a bit to avoid the timeout
             #println("   ",provincename, " ", provinceurl)
         end
     end
 
     #Populate our results DataFrame
+    final_df.Candidate_ID=candidate_ids
     final_df.Candidate=candidates
     final_df.Votes=votes
     final_df.Precinct=precincts
@@ -150,18 +156,31 @@ function main()
     final_df.Province=provinces
     final_df.Region=regions
 
-    println("Writing Failures to file...")
-    CSV.write("COMELECResultsFailed.csv",failed)
-    
     #write to csv
-        println("Writing Regional Results...")
+    try
+        println("Writing Failures to file...")
+        CSV.write("COMELECResultsFailed.csv",failed)
+    catch
+        println("Failed to Write COMELECResultsFailed.csv")
+    end
+    
+    regionlist=unique(final_df.Region)
+    println("Writing Regional Results...")
     for r in regionlist
-        CSV.write(r*"Results"*".csv",final_df[final_df.Region.==r,:])
+        try
+            CSV.write(r*"Results"*".csv",final_df[final_df.Region.==r,:])
+        catch
+            println("Failed to write for ",r)
+        end
     end
 
     println("Writing Overall Results...")
-    CSV.write("COMELECResults.csv",final_df)
-    regionlist=unique(final_df.Region)
+    try
+        CSV.write("COMELECResults.csv",final_df)
+    catch
+        println("Failed to write overall results")
+    end
+    
 
 
     
