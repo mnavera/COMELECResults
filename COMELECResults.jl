@@ -28,9 +28,17 @@ function main()
     citymuns=[]
     provinces=[]
     regions=[]
+    crace=[]
     failed=DataFrame(:Precinct=>[],:Barangay=>[],:CityMun=>[],:Province=>[],:Region=>[])
 
+    #=Change this to add other Races. for now:
+    5587->Presidential
+    5588->Vice-Presidential
+    5589->Senatorial
+    =#
     races=[5587,5588,5589]
+
+    
     #Get list of candidates
     CANDIDATELIST=getCandidates(races)
 
@@ -105,6 +113,7 @@ function main()
                                                             println("Percentage: ",i["per"])=#
 
                                                             #push element into our arrays
+                                                            push!(crace,i["cc"])
                                                             push!(candidate_ids,i["bo"])
                                                             push!(candidates,CANDIDATELIST[i["bo"]])
                                                             push!(votes,i["v"])
@@ -113,6 +122,7 @@ function main()
                                                             push!(citymuns,citymunname)
                                                             push!(provinces,provincename)
                                                             push!(regions,regionname)
+                                                            
 
                                                             #=println("candidates: ", candidates, ",", "Votes: ",votes)
                                                             println("precinct: ",clusters)
@@ -139,6 +149,7 @@ function main()
         end
     end
     #Populate our results DataFrame
+    final_df.Race=crace
     final_df.Candidate_ID=candidate_ids
     final_df.Candidate=candidates
     final_df.Votes=votes
